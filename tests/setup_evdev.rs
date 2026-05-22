@@ -1,0 +1,62 @@
+use std::fs;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use wayland_ptt::args::Config;
+use wayland_ptt::setup_evdev::{setup_evdev, SetupEvdevError};
+
+fn make_config(path: String) -> Config {
+    Config {
+        verbose: false,
+        listen_key: "KEY_LEFTMETA".to_string(),
+        send_key: "Super_L".to_string(),
+        mouse_button: None,
+        input_device_path: path,
+    }
+}
+
+#[test]
+fn rejects_missing_input_device_path() {
+    let config = make_config("/invalid/device".to_string());
+    match setup_evdev(&config) {
+        Err(SetupEvdevError::OpenDevice { path, .. }) => {
+            assert_eq!(path, "/invalid/device");
+        }
+        Ok(_) => panic!("expected OpenDevice"),
+        Err(other) => panic!("expected OpenDevice, got {other:?}"),
+    }
+}
+
+#[test]
+fn rejects_non_evdev_file() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!("wayland-ptt-test-{unique}.txt"));
+    fs::write(&path, b"not an evdev device").unwrap();
+
+    let config = make_config(path.display().to_string());
+    let result = setup_evdev(&config);
+
+    fs::remove_file(&path).unwrap();
+
+    match result {
+        Err(SetupEvdevError::OpenDevice { path, .. }) => {
+            assert!(path.contains("wayland-ptt-test-"));
+        }
+        Ok(_) => panic!("expected OpenDevice"),
+        Err(other) => panic!("expected OpenDevice, got {other:?}"),
+    }
+}
+
+#[test]
+fn rejects_invalid_listen_key_on_missing_device() {
+    let mut config = make_config("/invalid/device".to_string());
+    config.listen_key = "INVALID_KEY".to_string();
+
+    match setup_evdev(&config) {
+        Err(SetupEvdevError::OpenDevice { .. }) => {}
+        Ok(_) => panic!("expected an error"),
+        Err(other) => panic!("expected OpenDevice, got {other:?}"),
+    }
+}
