@@ -14,6 +14,7 @@ Based on the [original C++ version](https://github.com/Rush/wayland-push-to-talk
 ```
 wayland-ptt [-v] [-l listen_key] [-s send_key] /dev/input/by-id/<device-name>
 ```
+If `-l` and `-s` are omitted, both default to the mouse forward button.
 
 ## Reference
 - [Keyboard Input Event Codes](https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h)

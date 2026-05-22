@@ -12,9 +12,9 @@ fn parses_defaults_with_device_path() {
         parsed,
         Config {
             verbose: false,
-            listen_key: "KEY_LEFTMETA".to_string(),
-            send_key: "Super_L".to_string(),
-            mouse_button: None,
+            listen_key: "MOUSE6".to_string(),
+            send_key: "MOUSE6".to_string(),
+            mouse_button: Some(6),
             input_device_path: "/dev/input/by-id/test-kbd".to_string(),
         }
     );
@@ -59,7 +59,7 @@ fn parses_mouse_target() {
         parsed,
         Config {
             verbose: false,
-            listen_key: "KEY_LEFTMETA".to_string(),
+            listen_key: "MOUSE6".to_string(),
             send_key: "MOUSE5".to_string(),
             mouse_button: Some(5),
             input_device_path: "/dev/input/by-id/test-mouse".to_string(),

@@ -116,9 +116,42 @@ fn open_device(path: &str) -> Result<Device, ConfigureEvdevError> {
 }
 
 fn resolve_listen_key(key: &str) -> Result<KeyCode, ConfigureEvdevError> {
+    if let Some(suffix) = key.strip_prefix("MOUSE") {
+        return resolve_listen_mouse_button(suffix, key);
+    }
+
     KeyCode::from_str(key).map_err(|_| ConfigureEvdevError::InvalidListenKey {
         key: key.to_string(),
     })
+}
+
+fn resolve_listen_mouse_button(
+    suffix: &str,
+    original_key: &str,
+) -> Result<KeyCode, ConfigureEvdevError> {
+    let button = suffix
+        .parse::<u32>()
+        .map_err(|_| ConfigureEvdevError::InvalidListenKey {
+            key: original_key.to_string(),
+        })?;
+
+    let keycode = match button {
+        1 => KeyCode::BTN_LEFT,
+        2 => KeyCode::BTN_RIGHT,
+        3 => KeyCode::BTN_MIDDLE,
+        4 => KeyCode::BTN_SIDE,
+        5 => KeyCode::BTN_EXTRA,
+        6 => KeyCode::BTN_FORWARD,
+        7 => KeyCode::BTN_BACK,
+        8 => KeyCode::BTN_TASK,
+        _ => {
+            return Err(ConfigureEvdevError::InvalidListenKey {
+                key: original_key.to_string(),
+            });
+        }
+    };
+
+    Ok(keycode)
 }
 
 fn ensure_device_supports_key(
@@ -153,9 +186,9 @@ mod tests {
 
     #[test]
     fn resolves_valid_listen_key_name() {
-        let key = resolve_listen_key("KEY_LEFTMETA").unwrap();
+        let key = resolve_listen_key("BTN_FORWARD").unwrap();
 
-        assert_eq!(key, KeyCode::KEY_LEFTMETA);
+        assert_eq!(key, KeyCode::BTN_FORWARD);
     }
 
     #[test]
@@ -169,43 +202,60 @@ mod tests {
     }
 
     #[test]
+    fn resolves_mouse_listen_binding_alias() {
+        let key = resolve_listen_key("MOUSE5").unwrap();
+
+        assert_eq!(key, KeyCode::BTN_EXTRA);
+    }
+
+    #[test]
+    fn rejects_unknown_mouse_listen_binding_alias() {
+        let err = resolve_listen_key("MOUSE99").unwrap_err();
+
+        match err {
+            ConfigureEvdevError::InvalidListenKey { key } => assert_eq!(key, "MOUSE99"),
+            other => panic!("expected InvalidListenKey, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn classifies_matching_listen_key_press() {
-        let event = InputEvent::new(EventType::KEY.0, KeyCode::KEY_LEFTMETA.0, 1);
+        let event = InputEvent::new(EventType::KEY.0, KeyCode::BTN_FORWARD.0, 1);
 
         assert_eq!(
-            classify_listen_key_event(event, KeyCode::KEY_LEFTMETA),
+            classify_listen_key_event(event, KeyCode::BTN_FORWARD),
             Some(ListenKeyState::Pressed)
         );
     }
 
     #[test]
     fn classifies_matching_listen_key_release() {
-        let event = InputEvent::new(EventType::KEY.0, KeyCode::KEY_LEFTMETA.0, 0);
+        let event = InputEvent::new(EventType::KEY.0, KeyCode::BTN_FORWARD.0, 0);
 
         assert_eq!(
-            classify_listen_key_event(event, KeyCode::KEY_LEFTMETA),
+            classify_listen_key_event(event, KeyCode::BTN_FORWARD),
             Some(ListenKeyState::Released)
         );
     }
 
     #[test]
     fn ignores_matching_listen_key_autorepeat() {
-        let event = InputEvent::new(EventType::KEY.0, KeyCode::KEY_LEFTMETA.0, 2);
+        let event = InputEvent::new(EventType::KEY.0, KeyCode::BTN_FORWARD.0, 2);
 
-        assert_eq!(classify_listen_key_event(event, KeyCode::KEY_LEFTMETA), None);
+        assert_eq!(classify_listen_key_event(event, KeyCode::BTN_FORWARD), None);
     }
 
     #[test]
     fn ignores_other_key_events() {
         let event = InputEvent::new(EventType::KEY.0, KeyCode::KEY_A.0, 1);
 
-        assert_eq!(classify_listen_key_event(event, KeyCode::KEY_LEFTMETA), None);
+        assert_eq!(classify_listen_key_event(event, KeyCode::BTN_FORWARD), None);
     }
 
     #[test]
     fn ignores_non_key_events() {
         let event = InputEvent::new(EventType::RELATIVE.0, 0, 1);
 
-        assert_eq!(classify_listen_key_event(event, KeyCode::KEY_LEFTMETA), None);
+        assert_eq!(classify_listen_key_event(event, KeyCode::BTN_FORWARD), None);
     }
 }

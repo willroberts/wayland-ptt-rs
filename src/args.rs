@@ -26,9 +26,9 @@ where
     let program = args.next().unwrap_or_else(|| "wayland-ptt".to_string());
 
     let mut verbose = false;
-    let mut listen_key = "KEY_LEFTMETA".to_string();
-    let mut send_key = "Super_L".to_string();
-    let mut mouse_button = None;
+    let mut listen_key = "MOUSE6".to_string();
+    let mut send_key = "MOUSE6".to_string();
+    let mut mouse_button = Some(6);
     let mut input_device_path = None;
 
     while let Some(arg) = args.next() {

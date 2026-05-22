@@ -250,8 +250,8 @@ mod tests {
 
     #[test]
     fn resolves_valid_send_key_name() {
+        // Uses the left SUPER key as a test key.
         let keysym = resolve_send_keysym("Super_L").unwrap();
-
         assert_ne!(keysym, 0);
     }
 
