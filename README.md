@@ -1,52 +1,38 @@
 # wayland-ptt-rs
-This fixes the inability to use push to talk in Discord when running Wayland
+Enables push-to-talk (PTT) in X11 apps running under XWayland.
 
+Wayland restricts input events to only the currently-active window, so this tool helps route events to inactive windows using XWayland as an X11 compatibility layer (e.g. Discord).
 
-**NOTE: by default the left Meta (Windows) key is used for push to talk. In order to use a different key, see the configuration section below.**
+Based on the [original C++ version](https://github.com/Rush/wayland-push-to-talk-fix), with some language-based differences like using a pure-Rust `evdev` implementation instead of `libevdev`, and `x11rb` instead of `libxdo`.
 
-## Requirements
+## How It Works
+- Parses user configuration for which keys to receive and send
+- Listens to input events via `evdev`
+- If an event matches the `listen_key`, send input to X11 via `x11rb`
 
-Nothing special.
-- C++ compiler & Make
-- libevdev
-- libxdo (Debian/Ubuntu: `libxdo-dev`, Fedora/Centos: `libxdo-devel`)
-
-## Approach
-
-Read specific key events via evdev (needs sudo) and then pass them to libxdo to inject key presses to X apps.
-
-# Configuration
-The command supports three command line args.
-- `-v`: verbose mode, logs all keystrokes
-- `-k`: keycode to listen for. [Full list](https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h).
-- `-n`: keycode to send to discord. [Full list](https://github.com/xkbcommon/libxkbcommon/blob/master/include/xkbcommon/xkbcommon-keysyms.h) (ignore leading `XKB_KEY_`).
-- You can use mouse buttons as well for both options, you can determine the
-  correct keycode for `-k` using [evtest](https://cgit.freedesktop.org/evtest/).
-  The correct keycode for `-n` will be in the form of `MOUSE<num>` and you
-  can use [xev](https://gitlab.freedesktop.org/xorg/app/xev/) to determine
-  `<num>` for the particular button press that you are interested in.
-
-# Installation
-
-## Manual run
-
+## Usage
 ```
-make
-sudo ./wayland-ptt /dev/input/by-id/<device-id> &
+wayland-ptt [-v] [-l listen_key] [-s send_key] /dev/input/by-id/<device-name>
 ```
 
-## Autostart
+## Reference
+- [Keyboard Input Event Codes](https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h)
+- [Finding Mouse Input Event Codes](https://cgit.freedesktop.org/evtest/)
+- [X11 KeySym Codes](https://github.com/xkbcommon/libxkbcommon/blob/master/include/xkbcommon/xkbcommon-keysyms.h) (ignore leading `XKB_KEY_`)
+- [Finding X11 Mouse Button IDs](https://gitlab.freedesktop.org/xorg/app/xev/)
 
-First edit the `wayland-ptt.desktop` file and replace `/dev/input/by-id/<device-id>` with your device path. Then:
+## Installation
+Edit `wayland-ptt.desktop` and replace `/dev/input/by-id/<device-id>` with your desired device path, then install:
 ```
-make
+cargo build --release
 sudo make install
-
-# to allow you access `/dev/input` devices without root
-sudo usermod -aG input <your username>
 ```
-Then just log out and log in. A process named `wayland-ptt` should be running (visible in any process monitor).
+To access input devices without superuser privileges, add your user to the `input` group:
+```
+sudo usermod -aG input <user>
+```
+Confirm things are working with `ps | grep wayland-ptt` after logging in.
 
-# License
+## License
 
 MIT
