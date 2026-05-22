@@ -11,3 +11,4 @@ categories = ["command-line-utilities"]
 
 [dependencies]
 evdev = "0.13.2"
+x11rb = { version = "0.13.2", features = ["xtest"] }
