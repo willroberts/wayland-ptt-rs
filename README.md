@@ -1,4 +1,4 @@
-# wayland-push-to-talk-fix
+# wayland-ptt-rs
 This fixes the inability to use push to talk in Discord when running Wayland
 
 
@@ -32,12 +32,12 @@ The command supports three command line args.
 
 ```
 make
-sudo ./push-to-talk /dev/input/by-id/<device-id> &
+sudo ./wayland-ptt /dev/input/by-id/<device-id> &
 ```
 
 ## Autostart
 
-First edit the `push-to-talk.desktop` file and replace `/dev/input/by-id/<device-id>` with your device path. Then:
+First edit the `wayland-ptt.desktop` file and replace `/dev/input/by-id/<device-id>` with your device path. Then:
 ```
 make
 sudo make install
@@ -45,7 +45,7 @@ sudo make install
 # to allow you access `/dev/input` devices without root
 sudo usermod -aG input <your username>
 ```
-Then just log out and log in. A process named `push-to-talk` should be running (visible in any process monitor).
+Then just log out and log in. A process named `wayland-ptt` should be running (visible in any process monitor).
 
 # License
 
