@@ -1,7 +1,7 @@
 use std::process;
 
 use wayland_ptt::args::parse_args;
-use wayland_ptt::setup_evdev::setup_evdev;
+use wayland_ptt::setup_evdev::{input_device_metadata, setup_evdev};
 
 fn main() {
     let config = match parse_args() {
@@ -20,11 +20,10 @@ fn main() {
         }
     };
 
+    for line in input_device_metadata(&setup.device) {
+        eprintln!("{line}");
+    }
+
     println!("{config:?}");
-    println!(
-        "Input device name: {:?}, input device ID: {:?}, listen key code: {:?}",
-        setup.device.name(),
-        setup.device.input_id(),
-        setup.listen_key_code
-    );
+    println!("listen key code: {:?}", setup.listen_key_code);
 }

@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use evdev::{Device, KeyCode};
+use evdev::{Device, InputId, KeyCode};
 
 use crate::args::Config;
 
@@ -56,6 +56,23 @@ pub fn setup_evdev(config: &Config) -> Result<EvdevSetup, SetupEvdevError> {
         device,
         listen_key_code,
     })
+}
+
+pub fn input_device_metadata(device: &Device) -> [String; 2] {
+    format_input_device_metadata(device.name(), device.input_id())
+}
+
+// This is extracted into its own function for testability.
+pub fn format_input_device_metadata(name: Option<&str>, input_id: InputId) -> [String; 2] {
+    [
+        format!("Input device name: \"{}\"", name.unwrap_or("unknown")),
+        format!(
+            "Input device ID: bus {:#x} vendor {:#x} product {:#x}",
+            input_id.bus_type().0,
+            input_id.vendor(),
+            input_id.product()
+        ),
+    ]
 }
 
 fn open_device(path: &str) -> Result<Device, SetupEvdevError> {

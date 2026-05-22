@@ -1,8 +1,11 @@
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use evdev::{BusType, InputId};
 use wayland_ptt::args::Config;
-use wayland_ptt::setup_evdev::{setup_evdev, SetupEvdevError};
+use wayland_ptt::setup_evdev::{
+    format_input_device_metadata, setup_evdev, SetupEvdevError,
+};
 
 fn make_config(path: String) -> Config {
     Config {
@@ -59,4 +62,26 @@ fn rejects_invalid_listen_key_on_missing_device() {
         Ok(_) => panic!("expected an error"),
         Err(other) => panic!("expected OpenDevice, got {other:?}"),
     }
+}
+
+#[test]
+fn formats_input_device_metadata_like_cpp_output() {
+    let lines = format_input_device_metadata(
+        Some("Test Keyboard"),
+        InputId::new(BusType::BUS_USB, 0x1234, 0x5678, 0x1111),
+    );
+
+    assert_eq!(lines[0], "Input device name: \"Test Keyboard\"");
+    assert_eq!(lines[1], "Input device ID: bus 0x3 vendor 0x1234 product 0x5678");
+}
+
+#[test]
+fn formats_unknown_input_device_name() {
+    let lines = format_input_device_metadata(
+        None,
+        InputId::new(BusType::BUS_BLUETOOTH, 0xabcd, 0xef01, 0x2222),
+    );
+
+    assert_eq!(lines[0], "Input device name: \"unknown\"");
+    assert_eq!(lines[1], "Input device ID: bus 0x5 vendor 0xabcd product 0xef01");
 }
