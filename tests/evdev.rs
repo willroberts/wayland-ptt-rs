@@ -10,9 +10,9 @@ use wayland_ptt::evdev::{
 fn make_config(path: String) -> Config {
     Config {
         verbose: false,
-        listen_key: "MOUSE5".to_string(),
-        send_key: "MOUSE5".to_string(),
-        mouse_button: Some(5),
+        listen_key: "BTN_EXTRA".to_string(),
+        send_key: "MOUSE9".to_string(),
+        mouse_button: Some(9),
         input_device_path: path,
     }
 }

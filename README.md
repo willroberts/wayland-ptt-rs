@@ -17,7 +17,7 @@ wayland-ptt [-v] [-l listen_key] [-s send_key] /dev/input/by-id/<device-name>
 
 The quickest way to find your listen key's keycode is to run the tool with `-v` against your input device. The tool will print observed input events from that device, including the keycodes. This works for keyboard and mouse events.
 
-If `-l` and `-s` are omitted, both default to the `MOUSE5` button.
+If `-l` is omitted, it defaults to `BTN_EXTRA`. If `-s` is omitted, it defaults to `MOUSE9`. These correspond to the "forward" side button of the mouse.
 
 ## Installation
 Edit `wayland-ptt.desktop` and replace `/dev/input/by-id/<device-id>` with your desired device path, then install:

@@ -27,8 +27,8 @@ where
 
     let mut verbose = false;
     let mut listen_key = "BTN_EXTRA".to_string();
-    let mut send_key = "MOUSE5".to_string();
-    let mut mouse_button = Some(6);
+    let mut send_key = "MOUSE9".to_string();
+    let mut mouse_button = Some(9);
     let mut input_device_path = None;
 
     while let Some(arg) = args.next() {
