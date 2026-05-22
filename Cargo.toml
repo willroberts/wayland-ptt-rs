@@ -10,3 +10,4 @@ keywords = ["wayland", "xwayland", "x11", "push-to-talk", "evdev"]
 categories = ["command-line-utilities"]
 
 [dependencies]
+evdev = "0.13.2"
