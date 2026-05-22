@@ -58,12 +58,8 @@ fn main() {
             }
         };
 
-        if config.verbose {
-            let direction = match state {
-                ListenKeyState::Pressed => "down",
-                ListenKeyState::Released => "up",
-            };
-            eprintln!("key {direction}");
+        if config.verbose && state == ListenKeyState::Pressed {
+            eprintln!("Target key pressed, sending {}", config.send_key);
         }
 
         if let Err(err) = send_target_state(&x11_config, x11_target, state) {

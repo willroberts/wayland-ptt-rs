@@ -80,7 +80,7 @@ pub fn read_next_listen_key_state(
 ) -> io::Result<ListenKeyState> {
     loop {
         for event in evdev_config.device.fetch_events()? {
-            if verbose && event_is_key(event) {
+            if verbose && event_is_verbose_observed_key_down(event) {
                 eprintln!("{}", format_observed_event(event));
             }
 
@@ -104,8 +104,8 @@ pub fn format_observed_event(event: InputEvent) -> String {
     }
 }
 
-pub fn event_is_key(event: InputEvent) -> bool {
-    matches!(event.destructure(), EventSummary::Key(_, _, _))
+pub fn event_is_verbose_observed_key_down(event: InputEvent) -> bool {
+    matches!(event.destructure(), EventSummary::Key(_, _, 1))
 }
 
 pub fn classify_listen_key_event(
@@ -204,8 +204,8 @@ mod tests {
     // Otherwise they'd be located with the public API tests in tests/.
 
     use super::{
-        classify_listen_key_event, event_is_key, format_observed_event, resolve_listen_key,
-        ConfigureEvdevError, ListenKeyState,
+        classify_listen_key_event, event_is_verbose_observed_key_down, format_observed_event,
+        resolve_listen_key, ConfigureEvdevError, ListenKeyState,
     };
     use evdev::{EventType, InputEvent, KeyCode};
 
@@ -298,13 +298,20 @@ mod tests {
     fn formats_unknown_event_with_raw_identifiers() {
         let event = InputEvent::new(0xffff, 123, 9);
 
-        assert!(!event_is_key(event));
+        assert!(!event_is_verbose_observed_key_down(event));
     }
 
     #[test]
-    fn detects_key_events_for_verbose_logging() {
+    fn detects_key_down_events_for_verbose_logging() {
         let event = InputEvent::new(EventType::KEY.0, KeyCode::BTN_SIDE.0, 1);
 
-        assert!(event_is_key(event));
+        assert!(event_is_verbose_observed_key_down(event));
+    }
+
+    #[test]
+    fn ignores_key_up_events_for_verbose_logging() {
+        let event = InputEvent::new(EventType::KEY.0, KeyCode::BTN_SIDE.0, 0);
+
+        assert!(!event_is_verbose_observed_key_down(event));
     }
 }
