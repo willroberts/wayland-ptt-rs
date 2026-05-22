@@ -5,13 +5,13 @@ use evdev::{Device, InputId, KeyCode};
 
 use crate::args::Config;
 
-pub struct EvdevSetup {
+pub struct EvdevConfig {
     pub device: Device,
     pub listen_key_code: KeyCode,
 }
 
 #[derive(Debug)]
-pub enum SetupEvdevError {
+pub enum ConfigureEvdevError {
     OpenDevice {
         path: String,
         source: std::io::Error,
@@ -25,7 +25,7 @@ pub enum SetupEvdevError {
     },
 }
 
-impl fmt::Display for SetupEvdevError {
+impl fmt::Display for ConfigureEvdevError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::OpenDevice { path, source } => {
@@ -44,15 +44,20 @@ impl fmt::Display for SetupEvdevError {
     }
 }
 
-impl std::error::Error for SetupEvdevError {}
+impl std::error::Error for ConfigureEvdevError {}
 
-pub fn setup_evdev(config: &Config) -> Result<EvdevSetup, SetupEvdevError> {
+pub fn configure_evdev(config: &Config) -> Result<EvdevConfig, ConfigureEvdevError> {
     let device = open_device(&config.input_device_path)?;
     let listen_key_code = resolve_listen_key(&config.listen_key)?;
 
-    ensure_device_supports_key(&device, listen_key_code, &config.input_device_path, &config.listen_key)?;
+    ensure_device_supports_key(
+        &device,
+        listen_key_code,
+        &config.input_device_path,
+        &config.listen_key,
+    )?;
 
-    Ok(EvdevSetup {
+    Ok(EvdevConfig {
         device,
         listen_key_code,
     })
@@ -75,15 +80,15 @@ pub fn format_input_device_metadata(name: Option<&str>, input_id: InputId) -> [S
     ]
 }
 
-fn open_device(path: &str) -> Result<Device, SetupEvdevError> {
-    Device::open(path).map_err(|source| SetupEvdevError::OpenDevice {
+fn open_device(path: &str) -> Result<Device, ConfigureEvdevError> {
+    Device::open(path).map_err(|source| ConfigureEvdevError::OpenDevice {
         path: path.to_string(),
         source,
     })
 }
 
-fn resolve_listen_key(key: &str) -> Result<KeyCode, SetupEvdevError> {
-    KeyCode::from_str(key).map_err(|_| SetupEvdevError::InvalidListenKey {
+fn resolve_listen_key(key: &str) -> Result<KeyCode, ConfigureEvdevError> {
+    KeyCode::from_str(key).map_err(|_| ConfigureEvdevError::InvalidListenKey {
         key: key.to_string(),
     })
 }
@@ -93,7 +98,7 @@ fn ensure_device_supports_key(
     listen_key_code: KeyCode,
     path: &str,
     key: &str,
-) -> Result<(), SetupEvdevError> {
+) -> Result<(), ConfigureEvdevError> {
     let supports_key = device
         .supported_keys()
         .is_some_and(|keys| keys.contains(listen_key_code));
@@ -101,7 +106,7 @@ fn ensure_device_supports_key(
     if supports_key {
         Ok(())
     } else {
-        Err(SetupEvdevError::UnsupportedListenKey {
+        Err(ConfigureEvdevError::UnsupportedListenKey {
             path: path.to_string(),
             key: key.to_string(),
         })
@@ -113,7 +118,7 @@ mod tests {
     // These tests run against our internal resolve_listen_key helper.
     // Otherwise they'd be located with the public API tests in tests/.
 
-    use super::{resolve_listen_key, SetupEvdevError};
+    use super::{resolve_listen_key, ConfigureEvdevError};
     use evdev::KeyCode;
 
     #[test]
@@ -128,7 +133,7 @@ mod tests {
         let err = resolve_listen_key("INVALID_KEY").unwrap_err();
 
         match err {
-            SetupEvdevError::InvalidListenKey { key } => assert_eq!(key, "INVALID_KEY"),
+            ConfigureEvdevError::InvalidListenKey { key } => assert_eq!(key, "INVALID_KEY"),
             other => panic!("expected InvalidListenKey, got {other:?}"),
         }
     }
