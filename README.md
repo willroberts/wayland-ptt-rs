@@ -14,13 +14,10 @@ Based on the [original C++ version](https://github.com/Rush/wayland-push-to-talk
 ```
 wayland-ptt [-v] [-l listen_key] [-s send_key] /dev/input/by-id/<device-name>
 ```
-If `-l` and `-s` are omitted, both default to the mouse forward button.
 
-## Reference
-- [Keyboard Input Event Codes](https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h)
-- [Finding Mouse Input Event Codes](https://cgit.freedesktop.org/evtest/)
-- [X11 KeySym Codes](https://github.com/xkbcommon/libxkbcommon/blob/master/include/xkbcommon/xkbcommon-keysyms.h) (ignore leading `XKB_KEY_`)
-- [Finding X11 Mouse Button IDs](https://gitlab.freedesktop.org/xorg/app/xev/)
+The quickest way to find your listen key's keycode is to run the tool with `-v` against your input device. The tool will print observed input events from that device, including the keycodes. This works for keyboard and mouse events.
+
+If `-l` and `-s` are omitted, both default to the `MOUSE5` button.
 
 ## Installation
 Edit `wayland-ptt.desktop` and replace `/dev/input/by-id/<device-id>` with your desired device path, then install:
@@ -33,6 +30,10 @@ To access input devices without superuser privileges, add your user to the `inpu
 sudo usermod -aG input <user>
 ```
 Confirm things are working with `ps | grep wayland-ptt` after logging in.
+
+## Reference
+- [X11 KeySym Codes](https://github.com/xkbcommon/libxkbcommon/blob/master/include/xkbcommon/xkbcommon-keysyms.h) (ignore leading `XKB_KEY_`)
+- [Finding X11 Mouse Button IDs](https://gitlab.freedesktop.org/xorg/app/xev/)
 
 ## License
 

@@ -50,7 +50,7 @@ fn main() {
     }
 
     loop {
-        let state = match read_next_listen_key_state(&mut evdev_config) {
+        let state = match read_next_listen_key_state(&mut evdev_config, config.verbose) {
             Ok(state) => state,
             Err(err) => {
                 eprintln!("Failed to read evdev input: {err}");

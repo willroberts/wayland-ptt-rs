@@ -74,14 +74,38 @@ pub fn input_device_metadata(device: &Device) -> [String; 2] {
     format_input_device_metadata(device.name(), device.input_id())
 }
 
-pub fn read_next_listen_key_state(evdev_config: &mut EvdevConfig) -> io::Result<ListenKeyState> {
+pub fn read_next_listen_key_state(
+    evdev_config: &mut EvdevConfig,
+    verbose: bool,
+) -> io::Result<ListenKeyState> {
     loop {
         for event in evdev_config.device.fetch_events()? {
+            if verbose && event_is_key(event) {
+                eprintln!("{}", format_observed_event(event));
+            }
+
             if let Some(state) = classify_listen_key_event(event, evdev_config.listen_key_code) {
                 return Ok(state);
             }
         }
     }
+}
+
+pub fn format_observed_event(event: InputEvent) -> String {
+    match event.destructure() {
+        EventSummary::Key(_, code, value) => format!(
+            "Observed evdev event: type={:?} code={:?} ({}) value={}",
+            event.event_type(),
+            code,
+            event.code(),
+            value
+        ),
+        _ => unreachable!("format_observed_event is only used for EV_KEY events"),
+    }
+}
+
+pub fn event_is_key(event: InputEvent) -> bool {
+    matches!(event.destructure(), EventSummary::Key(_, _, _))
 }
 
 pub fn classify_listen_key_event(
@@ -180,7 +204,8 @@ mod tests {
     // Otherwise they'd be located with the public API tests in tests/.
 
     use super::{
-        classify_listen_key_event, resolve_listen_key, ConfigureEvdevError, ListenKeyState,
+        classify_listen_key_event, event_is_key, format_observed_event, resolve_listen_key,
+        ConfigureEvdevError, ListenKeyState,
     };
     use evdev::{EventType, InputEvent, KeyCode};
 
@@ -257,5 +282,29 @@ mod tests {
         let event = InputEvent::new(EventType::RELATIVE.0, 0, 1);
 
         assert_eq!(classify_listen_key_event(event, KeyCode::BTN_FORWARD), None);
+    }
+
+    #[test]
+    fn formats_key_event_with_symbolic_name() {
+        let event = InputEvent::new(EventType::KEY.0, KeyCode::BTN_SIDE.0, 1);
+
+        assert_eq!(
+            format_observed_event(event),
+            "Observed evdev event: type=KEY code=BTN_SIDE (275) value=1"
+        );
+    }
+
+    #[test]
+    fn formats_unknown_event_with_raw_identifiers() {
+        let event = InputEvent::new(0xffff, 123, 9);
+
+        assert!(!event_is_key(event));
+    }
+
+    #[test]
+    fn detects_key_events_for_verbose_logging() {
+        let event = InputEvent::new(EventType::KEY.0, KeyCode::BTN_SIDE.0, 1);
+
+        assert!(event_is_key(event));
     }
 }
