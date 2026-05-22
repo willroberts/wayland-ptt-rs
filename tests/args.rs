@@ -81,6 +81,19 @@ fn rejects_invalid_mouse_target() {
 }
 
 #[test]
+fn rejects_mouse_zero_target() {
+    let err = parse_args_from(args(&[
+        "wayland-ptt",
+        "-s",
+        "MOUSE0",
+        "/dev/input/by-id/test-mouse",
+    ]))
+    .unwrap_err();
+
+    assert_eq!(err, "Invalid mouse_button value: MOUSE0");
+}
+
+#[test]
 fn rejects_missing_device_path() {
     let err = parse_args_from(args(&["wayland-ptt", "-v"])).unwrap_err();
 

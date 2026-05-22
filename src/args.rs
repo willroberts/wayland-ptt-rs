@@ -44,6 +44,9 @@ where
                     .map(|suffix| suffix.parse::<u32>())
                     .transpose()
                     .map_err(|_| format!("Invalid mouse_button value: {value}"))?;
+                if mouse_button == Some(0) {
+                    return Err("Invalid mouse_button value: MOUSE0".to_string());
+                }
                 send_key = value;
             }
             _ if arg.starts_with('-') => return Err(usage(&program)),
