@@ -25,9 +25,9 @@ fn parses_all_supported_flags() {
     let parsed = parse_args_from(args(&[
         "wayland-ptt",
         "-v",
-        "-k",
+        "-l",
         "KEY_F13",
-        "-n",
+        "-s",
         "F24",
         "/dev/input/by-id/test-kbd",
     ]))
@@ -49,7 +49,7 @@ fn parses_all_supported_flags() {
 fn parses_mouse_target() {
     let parsed = parse_args_from(args(&[
         "wayland-ptt",
-        "-n",
+        "-s",
         "MOUSE5",
         "/dev/input/by-id/test-mouse",
     ]))
@@ -71,7 +71,7 @@ fn parses_mouse_target() {
 fn rejects_invalid_mouse_target() {
     let err = parse_args_from(args(&[
         "wayland-ptt",
-        "-n",
+        "-s",
         "MOUSEabc",
         "/dev/input/by-id/test-mouse",
     ]))

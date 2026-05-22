@@ -34,10 +34,10 @@ where
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "-v" => verbose = true,
-            "-k" => {
+            "-l" => {
                 listen_key = args.next().ok_or_else(|| usage(&program))?;
             }
-            "-n" => {
+            "-s" => {
                 let value = args.next().ok_or_else(|| usage(&program))?;
                 mouse_button = value
                     .strip_prefix("MOUSE")
