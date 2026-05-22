@@ -1,6 +1,6 @@
 [package]
 name = "wayland-ptt"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "Enables push-to-talk (PTT) in X11 apps running under XWayland"
 repository = "https://github.com/willroberts/wayland-ptt-rs"
