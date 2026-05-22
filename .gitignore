@@ -1,2 +1,5 @@
 push-to-talk
 .vscode
+
+# Rust ignores
+/target/

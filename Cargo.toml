@@ -1,0 +1,12 @@
+[package]
+name = "wayland-ptt-rs"
+version = "0.1.0"
+edition = "2024"
+description = "Enables push-to-talk (PTT) in X11 apps running under XWayland"
+repository = "https://github.com/willroberts/wayland-ptt-rs"
+license = "MIT"
+license-file = "LICENSE"
+keywords = ["wayland", "xwayland", "x11", "push-to-talk", "evdev"]
+categories = ["command-line-utilities"]
+
+[dependencies]
