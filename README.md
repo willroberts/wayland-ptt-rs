@@ -1,7 +1,7 @@
 # wayland-ptt-rs
-Enables push-to-talk (PTT) in X11 apps running under XWayland.
+Experiments with push-to-talk (PTT) input forwarding for X11 apps running under XWayland.
 
-Wayland restricts input events to only the currently-active window, so this tool helps route events to inactive windows using XWayland as an X11 compatibility layer (e.g. Discord).
+Wayland routes input to the active window. This tool reads a physical input device through `evdev` and experiments with forwarding its events to Discord on XWayland.
 
 Based on the [original C++ version](https://github.com/Rush/wayland-push-to-talk-fix), with some language-based differences like using a pure-Rust `evdev` implementation instead of `libevdev`, and `x11rb` instead of `libxdo`.
 
@@ -15,6 +15,8 @@ Based on the [original C++ version](https://github.com/Rush/wayland-push-to-talk
 wayland-ptt [-v] [--xtest] [-l listen_key] [-s send_key] /dev/input/by-id/<device-name>
 ```
 
+Use the `-event-` variant of your desired input device, e.g. `usb-Logitech_G403_HERO_Gaming_Mouse_166634563336-event-mouse`.
+
 The quickest way to find your listen key's keycode is to run the tool with `-v` against your input device. The tool will print observed input events from that device, including the keycodes. This works for keyboard and mouse events.
 
 If `-l` is omitted, it defaults to `BTN_EXTRA`. If `-s` is omitted, it defaults to `MOUSE9`. These correspond to the "forward" side button of the mouse.
@@ -27,7 +29,7 @@ To try unfocused PTT, bind Discord PTT to Mouse 9 or F13, then run (use `-s F13`
 wayland-ptt -v /dev/input/by-id/<device-name>
 ```
 
-Focus a native Wayland application and hold/release the physical PTT button. Verbose output shows the detected window ID, event, press/release, and whether X11 processed the `SendEvent` request. It cannot confirm delivery or handling in Discord. Synthetic X11 events carry the `send_event` flag; Discord has been observed to ignore this experiment while unfocused. Confirm behavior with Discord's PTT indicator or audio. If it ignores the event, this direct-window approach cannot provide working background PTT by itself.
+Focus a native Wayland application and hold/release the physical PTT button. Verbose output shows the detected window ID, event, press/release, and whether X11 processed the `SendEvent` request. It cannot confirm delivery or handling in Discord. Confirm behavior with Discord's PTT indicator or audio.
 
 If the request completes but PTT stays inactive, inspect the logged window with `xprop -id <window-id> WM_CLASS _NET_WM_NAME WM_NAME`, then repeat while Discord is focused. If the window is Discord and the focused test works, the remaining failure is specific to background input handling. If neither test works, Discord may be ignoring synthetic events entirely.
 
@@ -48,5 +50,4 @@ Confirm things are working with `ps | grep wayland-ptt` after logging in.
 - [Finding X11 Mouse Button IDs](https://gitlab.freedesktop.org/xorg/app/xev/)
 
 ## License
-
 MIT
