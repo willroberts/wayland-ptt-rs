@@ -11,6 +11,7 @@ fn parses_defaults_with_device_path() {
     assert_eq!(
         parsed,
         Config {
+            xtest: false,
             verbose: false,
             listen_key: "BTN_EXTRA".to_string(),
             send_key: "MOUSE9".to_string(),
@@ -36,6 +37,7 @@ fn parses_all_supported_flags() {
     assert_eq!(
         parsed,
         Config {
+            xtest: false,
             verbose: true,
             listen_key: "KEY_F13".to_string(),
             send_key: "F24".to_string(),
@@ -58,6 +60,7 @@ fn parses_mouse_target() {
     assert_eq!(
         parsed,
         Config {
+            xtest: false,
             verbose: false,
             listen_key: "BTN_EXTRA".to_string(),
             send_key: "MOUSE5".to_string(),
@@ -65,6 +68,14 @@ fn parses_mouse_target() {
             input_device_path: "/dev/input/by-id/test-mouse".to_string(),
         }
     );
+}
+
+#[test]
+fn selects_xtest_only_when_requested() {
+    let parsed = parse_args_from(args(&[
+        "wayland-ptt", "--xtest", "/dev/input/by-id/test-mouse",
+    ])).unwrap();
+    assert!(parsed.xtest);
 }
 
 #[test]

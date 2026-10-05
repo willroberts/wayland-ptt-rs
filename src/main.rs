@@ -1,8 +1,10 @@
 use std::process;
 
 use wayland_ptt::args::parse_args;
-use wayland_ptt::evdev::{configure_evdev, input_device_metadata, read_next_listen_key_state, ListenKeyState};
-use wayland_ptt::x11::{configure_x11, configure_x11_target, send_target_state};
+use wayland_ptt::evdev::{
+    ListenKeyState, configure_evdev, input_device_metadata, read_next_listen_key_state,
+};
+use wayland_ptt::x11::{configure_x11_target, configure_x11_with_backend, send_target_state};
 
 fn main() {
     let config = match parse_args() {
@@ -20,7 +22,7 @@ fn main() {
             process::exit(1);
         }
     };
-    let x11_config = match configure_x11() {
+    let mut x11_config = match configure_x11_with_backend(config.xtest) {
         Ok(config) => config,
         Err(err) => {
             eprintln!("{err}");
@@ -59,12 +61,14 @@ fn main() {
         };
 
         if config.verbose && state == ListenKeyState::Pressed {
-            eprintln!("Target key pressed, sending {}", config.send_key);
+            eprintln!("Target key pressed: {}", config.send_key);
         }
 
-        if let Err(err) = send_target_state(&x11_config, x11_target, state) {
+        if let Err(err) = send_target_state(&mut x11_config, x11_target, state, config.verbose) {
             eprintln!("{err}");
-            process::exit(1);
+            if config.xtest {
+                process::exit(1);
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ use std::env;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Config {
+    pub xtest: bool,
     // Set to 'true' to log configuration and matching libev events.
     pub verbose: bool,
     // The key to listen for in the event stream.
@@ -15,7 +16,9 @@ pub struct Config {
 }
 
 pub fn usage(program: &str) -> String {
-    format!("Usage: {program} [-v] [-l listen_key] [-s send_key] /dev/input/by-id/<device-name>")
+    format!(
+        "Usage: {program} [-v] [--xtest] [-l listen_key] [-s send_key] /dev/input/by-id/<device-name>"
+    )
 }
 
 pub fn parse_args_from<I>(args: I) -> Result<Config, String>
@@ -26,6 +29,7 @@ where
     let program = args.next().unwrap_or_else(|| "wayland-ptt".to_string());
 
     let mut verbose = false;
+    let mut xtest = false;
     let mut listen_key = "BTN_EXTRA".to_string();
     let mut send_key = "MOUSE9".to_string();
     let mut mouse_button = Some(9);
@@ -34,6 +38,7 @@ where
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "-v" => verbose = true,
+            "--xtest" => xtest = true,
             "-l" => {
                 listen_key = args.next().ok_or_else(|| usage(&program))?;
             }
@@ -62,6 +67,7 @@ where
     let input_device_path = input_device_path.ok_or_else(|| usage(&program))?;
 
     Ok(Config {
+        xtest,
         verbose,
         listen_key,
         send_key,

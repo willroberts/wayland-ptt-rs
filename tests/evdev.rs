@@ -9,6 +9,7 @@ use wayland_ptt::evdev::{
 
 fn make_config(path: String) -> Config {
     Config {
+        xtest: false,
         verbose: false,
         listen_key: "BTN_EXTRA".to_string(),
         send_key: "MOUSE9".to_string(),

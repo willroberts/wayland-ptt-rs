@@ -1,11 +1,13 @@
+use std::collections::VecDeque;
 use std::fmt;
 
 use x11rb::connection::{Connection, RequestConnection};
 use x11rb::errors::{ConnectError, ConnectionError, ReplyError};
-use x11rb::protocol::xproto::{
-    BUTTON_PRESS_EVENT, BUTTON_RELEASE_EVENT, KEY_PRESS_EVENT, KEY_RELEASE_EVENT,
-};
 use x11rb::protocol::xproto::ConnectionExt as _;
+use x11rb::protocol::xproto::{
+    Atom, AtomEnum, BUTTON_PRESS_EVENT, BUTTON_RELEASE_EVENT, ButtonPressEvent, EventMask,
+    KEY_PRESS_EVENT, KEY_RELEASE_EVENT, KeyButMask, KeyPressEvent, Window,
+};
 use x11rb::protocol::xtest::{ConnectionExt as _, X11_EXTENSION_NAME};
 use x11rb::rust_connection::RustConnection;
 use xkbcommon_rs::keysym::keysym_from_name;
@@ -19,8 +21,12 @@ const XTEST_MINOR_VERSION: u16 = 2;
 pub struct X11Config {
     pub connection: RustConnection,
     pub screen_num: usize,
-    pub xtest_major_version: u8,
-    pub xtest_minor_version: u16,
+    discord_window: Option<Window>,
+    pressed_window: Option<Window>,
+    wm_class: Atom,
+    net_wm_name: Atom,
+    wm_name: Atom,
+    xtest: bool,
 }
 
 #[derive(Debug)]
@@ -46,6 +52,9 @@ pub enum ConfigureX11Error {
         source: ReplyError,
     },
     SendInput {
+        source: ReplyError,
+    },
+    FindWindow {
         source: ReplyError,
     },
 }
@@ -84,6 +93,7 @@ impl fmt::Display for ConfigureX11Error {
             Self::SendInput { source } => {
                 write!(f, "Failed to send X11 input event: {source}")
             }
+            Self::FindWindow { source } => write!(f, "Failed to find Discord window: {source}"),
         }
     }
 }
@@ -97,11 +107,22 @@ pub enum X11Target {
 }
 
 pub fn configure_x11() -> Result<X11Config, ConfigureX11Error> {
-    configure_x11_with_display_name(None)
+    configure_x11_with_display_name_and_backend(None, false)
 }
 
 pub fn configure_x11_with_display_name(
     display_name: Option<&str>,
+) -> Result<X11Config, ConfigureX11Error> {
+    configure_x11_with_display_name_and_backend(display_name, false)
+}
+
+pub fn configure_x11_with_backend(xtest: bool) -> Result<X11Config, ConfigureX11Error> {
+    configure_x11_with_display_name_and_backend(None, xtest)
+}
+
+fn configure_x11_with_display_name_and_backend(
+    display_name: Option<&str>,
+    xtest: bool,
 ) -> Result<X11Config, ConfigureX11Error> {
     let (connection, screen_num) =
         x11rb::connect(display_name).map_err(|source| ConfigureX11Error::Connect {
@@ -109,19 +130,38 @@ pub fn configure_x11_with_display_name(
             source,
         })?;
 
-    ensure_xtest_extension(&connection)?;
+    if xtest {
+        ensure_xtest_extension(&connection)?;
+        connection
+            .xtest_get_version(XTEST_MAJOR_VERSION, XTEST_MINOR_VERSION)
+            .map_err(connection_error_to_configure_x11_error)?
+            .reply()
+            .map_err(|source| ConfigureX11Error::QueryXtestVersion { source })?;
+    }
 
-    let version = connection
-        .xtest_get_version(XTEST_MAJOR_VERSION, XTEST_MINOR_VERSION)
-        .map_err(connection_error_to_configure_x11_error)?
-        .reply()
-        .map_err(|source| ConfigureX11Error::QueryXtestVersion { source })?;
+    let atom = |name: &[u8]| -> Result<Atom, ConfigureX11Error> {
+        Ok(connection
+            .intern_atom(false, name)
+            .map_err(|source| ConfigureX11Error::FindWindow {
+                source: ReplyError::ConnectionError(source),
+            })?
+            .reply()
+            .map_err(|source| ConfigureX11Error::FindWindow { source })?
+            .atom)
+    };
+    let wm_class = atom(b"WM_CLASS")?;
+    let net_wm_name = atom(b"_NET_WM_NAME")?;
+    let wm_name = atom(b"WM_NAME")?;
 
     Ok(X11Config {
         connection,
         screen_num,
-        xtest_major_version: version.major_version,
-        xtest_minor_version: version.minor_version,
+        discord_window: None,
+        pressed_window: None,
+        wm_class,
+        net_wm_name,
+        wm_name,
+        xtest,
     })
 }
 
@@ -142,15 +182,28 @@ pub fn configure_x11_target(
 }
 
 pub fn send_target_state(
-    x11_config: &X11Config,
+    x11_config: &mut X11Config,
     target: X11Target,
     state: ListenKeyState,
+    verbose: bool,
 ) -> Result<(), ConfigureX11Error> {
     let (event_type, detail) = event_type_and_detail(target, state);
 
+    if !x11_config.xtest {
+        return send_direct(x11_config, target, state, verbose);
+    }
+
     let cookie = x11_config
         .connection
-        .xtest_fake_input(event_type, detail, x11rb::CURRENT_TIME, x11rb::NONE, 0, 0, 0)
+        .xtest_fake_input(
+            event_type,
+            detail,
+            x11rb::CURRENT_TIME,
+            x11rb::NONE,
+            0,
+            0,
+            0,
+        )
         .map_err(connection_error_to_send_input_error)?;
     cookie
         .check()
@@ -160,6 +213,179 @@ pub fn send_target_state(
         .flush()
         .map_err(connection_error_to_send_input_error)?;
 
+    Ok(())
+}
+
+fn property_text(connection: &RustConnection, window: Window, atom: Atom) -> Option<String> {
+    let reply = connection
+        .get_property(false, window, atom, AtomEnum::ANY, 0, 256)
+        .ok()?
+        .reply()
+        .ok()?;
+    if reply.format != 8 {
+        return None;
+    }
+    Some(String::from_utf8_lossy(&reply.value).into_owned())
+}
+
+fn discord_match_score(config: &X11Config, window: Window) -> u8 {
+    if let Some(class) = property_text(&config.connection, window, config.wm_class) {
+        if class.split('\0').any(|part| {
+            let part = part.to_ascii_lowercase();
+            part == "discord" || part.starts_with("discord-") || part.ends_with(".discord")
+        }) {
+            return 2;
+        }
+        // A browser tab may have "Discord" in its title. Its WM_CLASS belongs to the browser.
+        if !class.is_empty() {
+            return 0;
+        }
+    }
+    for atom in [config.net_wm_name, config.wm_name] {
+        if property_text(&config.connection, window, atom)
+            .is_some_and(|name| name.to_ascii_lowercase().contains("discord"))
+        {
+            return 1;
+        }
+    }
+    0
+}
+
+fn find_discord_window(config: &X11Config) -> Result<Option<Window>, ConfigureX11Error> {
+    let root = config.connection.setup().roots[config.screen_num].root;
+    let mut pending = VecDeque::from([root]);
+    let mut title_match = None;
+    while let Some(window) = pending.pop_front() {
+        match discord_match_score(config, window) {
+            2 => return Ok(Some(window)),
+            1 if title_match.is_none() => title_match = Some(window),
+            _ => {}
+        }
+        // Windows may disappear while the tree is being traversed.
+        if let Ok(cookie) = config.connection.query_tree(window) {
+            if let Ok(tree) = cookie.reply() {
+                pending.extend(tree.children);
+            }
+        }
+    }
+    Ok(title_match)
+}
+
+fn window_exists(config: &X11Config, window: Window) -> bool {
+    config
+        .connection
+        .get_window_attributes(window)
+        .ok()
+        .is_some_and(|cookie| cookie.reply().is_ok())
+}
+
+fn send_direct(
+    config: &mut X11Config,
+    target: X11Target,
+    state: ListenKeyState,
+    verbose: bool,
+) -> Result<(), ConfigureX11Error> {
+    if state == ListenKeyState::Pressed && config.pressed_window.is_some() {
+        return Ok(());
+    }
+    if state == ListenKeyState::Released && config.pressed_window.is_none() {
+        return Ok(());
+    }
+    if let Some(pressed_window) = config.pressed_window {
+        if !window_exists(config, pressed_window) {
+            config.pressed_window = None;
+            config.discord_window = None;
+            if verbose {
+                eprintln!("Discord window disappeared before release; event skipped");
+            }
+            return Ok(());
+        }
+    }
+    if config
+        .discord_window
+        .is_some_and(|window| !window_exists(config, window))
+    {
+        config.discord_window = None;
+    }
+    if config.discord_window.is_none() {
+        config.discord_window = find_discord_window(config)?;
+        if verbose {
+            match config.discord_window {
+                Some(window) => eprintln!("Detected Discord window: {window:#x}"),
+                None => eprintln!("Discord window not found; event skipped"),
+            }
+        }
+    }
+    let Some(window) = config.pressed_window.or(config.discord_window) else {
+        return Ok(());
+    };
+    let root = config.connection.setup().roots[config.screen_num].root;
+    let (event_type, detail) = event_type_and_detail(target, state);
+    let event: [u8; 32] = match target {
+        X11Target::Key { .. } => KeyPressEvent {
+            response_type: event_type,
+            detail,
+            sequence: 0,
+            time: x11rb::CURRENT_TIME,
+            root,
+            event: window,
+            child: x11rb::NONE,
+            root_x: 0,
+            root_y: 0,
+            event_x: 0,
+            event_y: 0,
+            state: KeyButMask::default(),
+            same_screen: true,
+        }
+        .into(),
+        X11Target::MouseButton { .. } => ButtonPressEvent {
+            response_type: event_type,
+            detail,
+            sequence: 0,
+            time: x11rb::CURRENT_TIME,
+            root,
+            event: window,
+            child: x11rb::NONE,
+            root_x: 0,
+            root_y: 0,
+            event_x: 0,
+            event_y: 0,
+            state: KeyButMask::default(),
+            same_screen: true,
+        }
+        .into(),
+    };
+    if verbose {
+        eprintln!("SendEvent {target:?} {state:?} to Discord window {window:#x}");
+    }
+    // NO_EVENT delivers to the client that owns this window, even if it did not
+    // select KeyPress/ButtonPress on this exact window.
+    let result = config
+        .connection
+        .send_event(false, window, EventMask::NO_EVENT, event)
+        .map_err(connection_error_to_send_input_error)?
+        .check()
+        .map_err(|source| ConfigureX11Error::SendInput { source });
+    if let Err(err) = result {
+        config.discord_window = None;
+        config.pressed_window = None;
+        if verbose {
+            eprintln!("SendEvent failed: {err}");
+        }
+        return Err(err);
+    }
+    config
+        .connection
+        .flush()
+        .map_err(connection_error_to_send_input_error)?;
+    config.pressed_window = if state == ListenKeyState::Pressed {
+        Some(window)
+    } else {
+        None
+    };
+    if verbose {
+        eprintln!("SendEvent request completed (Discord delivery and handling unverified)");
+    }
     Ok(())
 }
 
@@ -191,9 +417,11 @@ fn connection_error_to_send_input_error(source: ConnectionError) -> ConfigureX11
 }
 
 fn resolve_send_keysym(key: &str) -> Result<u32, ConfigureX11Error> {
-    keysym_from_name(key, 0).map(u32::from).ok_or_else(|| ConfigureX11Error::InvalidSendKey {
-        key: key.to_string(),
-    })
+    keysym_from_name(key, 0)
+        .map(u32::from)
+        .ok_or_else(|| ConfigureX11Error::InvalidSendKey {
+            key: key.to_string(),
+        })
 }
 
 fn find_keycode_for_keysym(
@@ -240,9 +468,7 @@ fn event_type_and_detail(target: X11Target, state: ListenKeyState) -> (u8, u8) {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        event_type_and_detail, resolve_send_keysym, ConfigureX11Error, X11Target,
-    };
+    use super::{ConfigureX11Error, X11Target, event_type_and_detail, resolve_send_keysym};
     use crate::evdev::ListenKeyState;
     use x11rb::protocol::xproto::{
         BUTTON_PRESS_EVENT, BUTTON_RELEASE_EVENT, KEY_PRESS_EVENT, KEY_RELEASE_EVENT,
@@ -270,10 +496,7 @@ mod tests {
     #[test]
     fn maps_key_press_event_type_and_detail() {
         assert_eq!(
-            event_type_and_detail(
-                X11Target::Key { keycode: 42 },
-                ListenKeyState::Pressed
-            ),
+            event_type_and_detail(X11Target::Key { keycode: 42 }, ListenKeyState::Pressed),
             (KEY_PRESS_EVENT, 42)
         );
     }
@@ -281,10 +504,7 @@ mod tests {
     #[test]
     fn maps_key_release_event_type_and_detail() {
         assert_eq!(
-            event_type_and_detail(
-                X11Target::Key { keycode: 42 },
-                ListenKeyState::Released
-            ),
+            event_type_and_detail(X11Target::Key { keycode: 42 }, ListenKeyState::Released),
             (KEY_RELEASE_EVENT, 42)
         );
     }
